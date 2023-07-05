@@ -30,7 +30,8 @@ from modules import devices
 from typing import Dict, List, Any
 import piexif
 import piexif.helper
-
+from rembg import remove
+from PIL import Image
 
 def upscaler_to_index(name: str):
     try:
@@ -397,11 +398,24 @@ class Api:
 
         b64images = list(map(encode_pil_to_base64, processed.images)) if send_images else []
 
-        if not img2imgreq.include_init_images:
-            img2imgreq.init_images = None
-            img2imgreq.mask = None
+        # 가장 첫번째 이미지의 base64 문자열을 가져옴
+        base64_string = b64images[0]
 
-        return models.ImageToImageResponse(images=b64images, parameters=vars(img2imgreq), info=processed.js())
+        # base64 문자열을 이미지로 디코딩
+        decoded_image = Image.open(BytesIO(base64.b64decode(base64_string)))
+
+        # 배경 제거
+        processed_image = remove(decoded_image)
+        
+
+
+        # 처리된 이미지를 원하는 형식으로 변환
+        
+        output_buffer = BytesIO()
+        processed_image.save(output_buffer, format="PNG")
+        output_base64_string = base64.b64encode(output_buffer.getvalue()).decode('utf-8')
+
+        return models.ImageToImageResponse(images=[output_base64_string], parameters=vars(img2imgreq), info=processed.js())
 
     def extras_single_image_api(self, req: models.ExtrasSingleImageRequest):
         reqDict = setUpscalers(req)
